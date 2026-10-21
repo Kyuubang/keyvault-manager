@@ -31,6 +31,7 @@ APP_ID=$(az ad app create --display-name "Key Vault Manager" --sign-in-audience 
 
 # SPA redirect URIs (MSAL uses a small redirect bridge page)
 az rest --method PATCH --uri "https://graph.microsoft.com/v1.0/applications(appId='$APP_ID')" \
+  --headers "Content-Type=application/json" \
   --body '{"spa":{"redirectUris":["http://localhost:5173/redirect.html","https://YOUR-HOST/redirect.html"]}}'
 
 # Delegated permissions
@@ -83,6 +84,17 @@ Serve it over HTTPS, and register `https://YOUR-HOST/redirect.html` as a SPA red
 npm test           # server unit and route tests (mocked Azure)
 npm run typecheck
 ```
+
+## Troubleshooting sign-in
+
+- **AADSTS9002326** ("Cross-origin token redemption is permitted only for the 'Single-Page Application' client-type"): the redirect URI is registered under the **Web** platform instead of **Single-page application**. Move it:
+  ```bash
+  az rest --method PATCH --uri "https://graph.microsoft.com/v1.0/applications(appId='$APP_ID')" \
+    --headers "Content-Type=application/json" \
+    --body '{"web":{"redirectUris":[]},"spa":{"redirectUris":["http://localhost:5173/redirect.html"]}}'
+  ```
+- **AADSTS50011** (redirect URI mismatch): register `<origin>/redirect.html` exactly, including the port.
+- **AADSTS65001 / consent required**: your tenant blocks user consent. An admin must run `az ad app permission admin-consent --id $APP_ID`.
 
 ## Notes and limits
 
