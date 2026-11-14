@@ -94,6 +94,10 @@ describe("buildAuditQuery", () => {
   it("has no secret filter for whole-vault queries", () => {
     expect(buildAuditQuery()).not.toContain("/secrets/");
   });
+  it("limits to write operations when asked", () => {
+    expect(buildAuditQuery("db-pass", true)).toContain('OperationName in~ ("SecretSet"');
+    expect(buildAuditQuery("db-pass")).not.toContain("in~");
+  });
   it("rejects invalid secret names", () => {
     expect(() => buildAuditQuery('x" | evil')).toThrow();
   });

@@ -98,6 +98,8 @@ export function SecretWorkspace(props: { vault: Vault; name: string; onSaved: ()
       {tab === "history" && (
         <div className="tab-panel" role="tabpanel" id="panel-history" aria-labelledby="tab-history">
           <HistoryTab
+            vault={vault}
+            secret={name}
             versions={versions}
             onOpen={(version) => openInEditor({ type: "open", version })}
             onCompare={(version) => openInEditor({ type: "compare", version })}

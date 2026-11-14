@@ -3,6 +3,7 @@ import Editor, { DiffEditor, type Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { AlertTriangle, ArrowLeft, Columns2, GitCompare, Rows2, Save, Undo2, WrapText, Pilcrow } from "lucide-react";
 import { monaco } from "../monaco";
+import { currentUsername } from "../auth";
 import { api, type SecretValue, type SecretVersion, type Vault } from "../api";
 import { detectLanguage, eolOf, errorMessage, formatDate, shortVersion, useDarkMode } from "../util";
 
@@ -148,7 +149,7 @@ export function EditorTab(props: {
       const saved = await api.save(vault.name, name, {
         value: draft,
         contentType: contentType.trim() || null,
-        tags: (current ?? latest)?.tags,
+        tags: { ...(current ?? latest)?.tags, ...(currentUsername() ? { updatedBy: currentUsername() } : {}) },
       });
       const value: SecretValue = { ...saved, name, value: draft };
       cache.current.set(saved.version, value);

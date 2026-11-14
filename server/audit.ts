@@ -8,11 +8,14 @@ const IDENTITY = (expr: string) => `coalesce(
       tostring(${expr}.claim["http://schemas.microsoft.com/identity/claims/objectidentifier"]))`;
 
 /** KQL over both the resource-specific (AZKVAuditLogs) and legacy (AzureDiagnostics) tables. */
-export function buildAuditQuery(secretName?: string): string {
+export const WRITE_OPERATIONS = ["SecretSet", "SecretUpdate", "SecretDelete", "SecretRecover", "SecretPurge", "SecretRestore"];
+
+export function buildAuditQuery(secretName?: string, writesOnly = false): string {
   if (secretName !== undefined && !isSecretName(secretName)) throw new Error("Invalid secret name");
   const filter = secretName
     ? `| where Target matches regex @"(?i)/secrets/${secretName}(/|$|\\?)" or RequestUri matches regex @"(?i)/secrets/${secretName}(/|$|\\?)"`
     : "";
+  const writes = writesOnly ? `| where OperationName in~ (${WRITE_OPERATIONS.map((o) => `"${o}"`).join(", ")})` : "";
   return `union isfuzzy=true
 (AZKVAuditLogs
   | extend Ident = column_ifexists("Identity", dynamic(null))
@@ -42,6 +45,7 @@ export function buildAuditQuery(secretName?: string): string {
       RequestUri = tostring(column_ifexists("requestUri_s", "")),
       Client = tostring(column_ifexists("clientInfo_s", "")))
 ${filter}
+${writes}
 | sort by TimeGenerated desc
 | take 500`;
 }

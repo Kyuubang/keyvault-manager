@@ -60,3 +60,5 @@ export async function getToken(resource: Resource): Promise<string> {
     throw e;
   }
 }
+
+export const currentUsername = () => pca.getActiveAccount()?.username ?? "";
