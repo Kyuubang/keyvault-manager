@@ -1,0 +1,12 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: keyvault-manager
+  namespace: keyvault-manager
+spec:
+  routes:
+    - match: Host(`kv.example.internal`)
+      kind: Rule
+      services:
+        - name: keyvault-manager
+          port: 80

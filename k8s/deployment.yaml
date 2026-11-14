@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keyvault-manager
+  namespace: keyvault-manager
+  labels:
+    app: keyvault-manager
+    environment: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keyvault-manager
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        app: keyvault-manager
+        environment: production
+    spec:
+      containers:
+        - name: keyvault-manager
+          image: ghcr.io/kyuubang/keyvault-manager:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http-port
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: keyvault-manager-env
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 20
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 30
