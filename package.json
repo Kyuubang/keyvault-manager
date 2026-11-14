@@ -2,6 +2,8 @@
   "name": "keyvault-manager",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
+  "author": "Ahmad Bayhaqi <ahmad.bayhaqi@nawatech.co>",
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -n api,web \"tsx watch server/index.ts\" \"vite\"",

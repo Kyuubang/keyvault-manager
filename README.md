@@ -1,18 +1,40 @@
+
 # Key Vault Manager
 
-A small, stateless web app for editing Azure Key Vault secrets safely.
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](package.json)
 
-- **Multi-line editor** (Monaco) that opens the latest version of a secret by default.
-- **Review before save**: every save shows a diff against the current latest version, then writes a new version.
-- **Compare with any version**: diff your draft against any previous version while you keep editing.
-- **Browse history**: open any previous version, and restore it by saving it as the new latest.
-- **Activity**: secret access audit from Log Analytics (who read or changed what, from where, and denied attempts), plus vault changes from the Azure Activity Log.
-- **Only writable vaults**: the vault list shows only vaults where you can set secrets (RBAC `setSecret` data action, or a `set` access policy).
-- **Conflict protection**: if someone else saved a newer version while you were editing, the save is blocked and you are asked to review again.
+A small, stateless web UI for safely editing secrets in **Azure Key Vault** — with diff-before-save, version history, and a full access audit trail.
+
+No database. No stored credentials. Every action runs under the signed-in user's own Azure permissions.
+
+## Table of contents
+
+- [Features](#features)
+- [How it works](#how-it-works)
+- [Quick start](#quick-start)
+- [Configuration](#configuration)
+- [Deployment](#deployment)
+- [Required Azure permissions](#required-azure-permissions)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
+- [Limits](#limits)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Features
+
+- 📝 **Monaco editor** — opens the latest version of a secret, with full syntax support.
+- 🔍 **Review before save** — every save shows a diff against the current latest version before writing a new one.
+- 🔀 **Compare any version** — diff your draft against any previous version while you keep editing.
+- 🕘 **Version history** — browse previous versions, see who saved each one, and restore any of them as the new latest.
+- 📊 **Activity audit** — secret access history from Log Analytics (who read/changed what, from where, and denied attempts), plus vault-level changes from the Azure Activity Log.
+- 🔐 **Scoped visibility** — the vault list shows only vaults you can actually write to (RBAC `setSecret`, or a `set` access policy).
+- ⚠️ **Conflict protection** — if someone else saved a newer version while you were editing, your save is blocked until you review again.
 
 ## How it works
 
-There is no database and no stored state. You sign in with Entra ID (Azure AD SSO) in the browser, and the SPA gets *delegated* tokens for you. A thin Node server forwards each request, with your tokens, to Azure:
+You sign in with Entra ID (Azure AD SSO) in the browser; the SPA obtains **delegated** tokens for you. A thin Node server forwards each request — with your own tokens — to Azure. It holds no credentials of its own, so every call runs under your permissions.
 
 | Purpose | Azure API | Token scope |
 | --- | --- | --- |
@@ -22,9 +44,19 @@ There is no database and no stored state. You sign in with Entra ID (Azure AD SS
 | Group membership for access policies | Microsoft Graph `/me/getMemberObjects` | `User.Read` |
 | Vault changes | Azure Activity Log | ARM token |
 
-The server exists because the Key Vault data plane does not allow browser CORS. It has no credentials of its own, so Azure applies your own permissions to every call. It validates vault, secret and version names, which prevents requests to arbitrary hosts. It also sends `Cache-Control: no-store` on all API responses.
+The server exists only because the Key Vault data plane does not allow browser CORS. It validates vault, secret and version names (no arbitrary-host requests) and sends `Cache-Control: no-store` on every API response.
 
-## 1. Create the app registration
+## Quick start
+
+```bash
+cp .env.example .env      # set AZURE_CLIENT_ID and AZURE_TENANT_ID
+npm install
+npm run dev               # web on http://localhost:5173, API on :8080
+```
+
+See [Create the app registration](#1-app-registration-one-time) below before your first sign-in.
+
+### 1. App registration (one-time)
 
 ```bash
 APP_ID=$(az ad app create --display-name "Key Vault Manager" --sign-in-audience AzureADMyOrg --query appId -o tsv)
@@ -48,35 +80,44 @@ echo "AZURE_CLIENT_ID=$APP_ID"; az account show --query "'AZURE_TENANT_ID=' + te
 
 No client secret is needed.
 
-## 2. What users need in Azure
+## Configuration
 
-- **To edit a vault**: *Key Vault Secrets Officer* (RBAC vaults), or an access policy with secret `Get`, `List` and `Set` (access-policy vaults). Group-based access policies are supported.
-- **To find vaults**: *Reader* on the vault, resource group or subscription.
-- **For the secret access audit**: the vault needs a diagnostic setting that sends `AuditEvent` logs to a Log Analytics workspace, and the user needs read access to those logs (for example *Log Analytics Reader*, or *Reader* on the vault when the workspace uses resource-context access). Without these, the Activity tab explains what is missing and still shows vault changes.
+| Variable | Required | Description |
+| --- | --- | --- |
+| `AZURE_CLIENT_ID` | yes | App registration (SPA) client ID |
+| `AZURE_TENANT_ID` | yes | Entra ID tenant ID |
+| `PORT` | no | API/web server port (default `8080`) |
 
-## 3. Run
+## Deployment
 
-```bash
-cp .env.example .env      # set AZURE_CLIENT_ID and AZURE_TENANT_ID
-npm install
-npm run dev               # web on http://localhost:5173, API on :8080
-```
-
-Production:
-
-```bash
-npm run build
-npm start                 # serves the SPA and API on $PORT (default 8080)
-```
-
-Or use Docker:
+### Docker
 
 ```bash
 docker build -t keyvault-manager .
 docker run -p 8080:8080 -e AZURE_CLIENT_ID=... -e AZURE_TENANT_ID=... keyvault-manager
 ```
 
-Serve it over HTTPS, and register `https://YOUR-HOST/redirect.html` as a SPA redirect URI. The server can run as many instances as you like because it keeps no state; App Service or Container Apps both work.
+### Kubernetes
+
+Manifests are in [`k8s/`](k8s/) (Deployment, Service, ConfigMap, and a Traefik `IngressRoute`):
+
+```bash
+kubectl apply -k k8s/
+```
+
+Set real values for `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` in `k8s/configmap.yaml` and adjust the `Host()` rule in `k8s/ingressroute.yaml` for your domain.
+
+> Serve it over HTTPS and register `https://YOUR-HOST/redirect.html` as a SPA redirect URI. The server keeps no state, so it scales horizontally without restriction.
+
+## Required Azure permissions
+
+| Capability | Requirement |
+| --- | --- |
+| Edit a vault | *Key Vault Secrets Officer* (RBAC), or an access policy with `Get`, `List`, `Set` (access-policy vaults, incl. group-based) |
+| Discover vaults | *Reader* on the vault, resource group, or subscription |
+| Secret access audit | Vault must ship `AuditEvent` logs to a Log Analytics workspace, and the user needs read access to that workspace (e.g. *Log Analytics Reader*, or *Reader* on the vault for resource-context workspaces) |
+
+Without audit permissions, the Activity tab still shows vault changes and explains what's missing.
 
 ## Development
 
@@ -85,21 +126,36 @@ npm test           # server unit and route tests (mocked Azure)
 npm run typecheck
 ```
 
-## Troubleshooting sign-in
+## Troubleshooting
 
-- **AADSTS9002326** ("Cross-origin token redemption is permitted only for the 'Single-Page Application' client-type"): the redirect URI is registered under the **Web** platform instead of **Single-page application**. Move it:
-  ```bash
-  az rest --method PATCH --uri "https://graph.microsoft.com/v1.0/applications(appId='$APP_ID')" \
-    --headers "Content-Type=application/json" \
-    --body '{"web":{"redirectUris":[]},"spa":{"redirectUris":["http://localhost:5173/redirect.html"]}}'
-  ```
-- **AADSTS50011** (redirect URI mismatch): register `<origin>/redirect.html` exactly, including the port.
-- **AADSTS65001 / consent required**: your tenant blocks user consent. An admin must run `az ad app permission admin-consent --id $APP_ID`.
+| Error | Cause | Fix |
+| --- | --- | --- |
+| `AADSTS9002326` | Redirect URI registered under **Web** instead of **Single-page application** | Move it to `spa.redirectUris` (see snippet below) |
+| `AADSTS50011` | Redirect URI mismatch | Register `<origin>/redirect.html` exactly, including the port |
+| `AADSTS65001` | Tenant blocks user consent | An admin runs `az ad app permission admin-consent --id $APP_ID` |
 
-## Notes and limits
+```bash
+az rest --method PATCH --uri "https://graph.microsoft.com/v1.0/applications(appId='$APP_ID')" \
+  --headers "Content-Type=application/json" \
+  --body '{"web":{"redirectUris":[]},"spa":{"redirectUris":["http://localhost:5173/redirect.html"]}}'
+```
+
+## Limits
 
 - Azure public cloud only (`*.vault.azure.net`).
-- Secret values are limited to 25,000 characters (the Key Vault limit is 25 KB).
-- Saving always creates a new version and copies tags from the latest version. The new version is enabled and has no expiry or activation date; set those in the Azure portal if you need them.
-- Deleting secrets is intentionally not supported.
+- Secret values are limited to 25,000 characters (Key Vault's own limit is 25 KB).
+- Saving always creates a new version, copying tags from the latest version; the new version is enabled with no expiry/activation date (set those in the Azure portal if needed).
+- Deleting secrets is intentionally unsupported.
 - Secrets managed by Key Vault certificates are hidden.
+
+## Contributing
+
+Issues and pull requests are welcome. Please run `npm test` and `npm run typecheck` before submitting.
+
+## License
+
+[MIT](LICENSE)
+
+## Maintainer
+
+Ahmad Bayhaqi — ahmad.bayhaqi@nawatech.co
