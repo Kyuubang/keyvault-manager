@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp } from "./app.js";
@@ -35,7 +36,13 @@ app.use((_req, res, next) => {
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../web");
 app.use(express.static(webRoot, { index: false, maxAge: "1h" }));
-app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(path.join(webRoot, "index.html")));
+const spaLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.get(/^(?!\/api\/).*/, spaLimiter, (_req, res) => res.sendFile(path.join(webRoot, "index.html")));
 
 const port = Number(process.env.PORT ?? 8080);
 app.listen(port, () => {
