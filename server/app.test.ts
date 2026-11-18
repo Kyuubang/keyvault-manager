@@ -135,7 +135,8 @@ describe("audit routes", () => {
       })],
     ]);
     const res = await request(createApp({ fetch: f }))
-      .get(`/api/audit?resourceId=${encodeURIComponent(vaultId("kv-1"))}&secret=db&days=30`)
+      .post("/api/audit")
+      .send({ resourceId: vaultId("kv-1"), secretName: "db", days: 30 })
       .set("x-la-token", "t");
     expect(res.status).toBe(200);
     expect(res.body).toEqual([{ OperationName: "SecretSet", Caller: "me@x.com" }]);
@@ -146,7 +147,8 @@ describe("audit routes", () => {
 
   it("rejects non-vault resource ids", async () => {
     const res = await request(createApp({ fetch: fakeFetch([]) }))
-      .get(`/api/audit?resourceId=${encodeURIComponent("/subscriptions/x/whatever")}`)
+      .post("/api/audit")
+      .send({ resourceId: "/subscriptions/x/whatever" })
       .set("x-la-token", "t");
     expect(res.status).toBe(400);
   });
