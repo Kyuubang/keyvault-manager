@@ -269,21 +269,21 @@ export function createApp(opts: { fetch?: Fetch; clientId?: string; tenantId?: s
     return { id: id as string, ...parsed };
   };
   const daysQuery = (req: Request) => {
-    const days = Number(req.query.days ?? 7);
+    const days = Number(req.body?.days ?? 7);
     if (!Number.isInteger(days) || days < 1 || days > 90) throw new HttpError(400, "days must be 1-90");
     return days;
   };
 
-  app.get(
+  app.post(
     "/api/audit",
     route(async (req) => {
       const vault = vaultIdQuery(req);
       const days = daysQuery(req);
-      const secretName = req.query.secretName;
+      const secretName = req.body?.secretName;
       if (secretName !== undefined && !isSecretName(secretName)) throw new HttpError(400, "Invalid secret name");
       const body: { tables?: LaTable[] } = await call(fetchFn, `${LOG_ANALYTICS}${vault.id}/query`, bearer(req, "x-la-token"), {
         method: "POST",
-        body: JSON.stringify({ query: buildAuditQuery(secretName as string | undefined, req.query.changes === "1"), timespan: `P${days}D` }),
+        body: JSON.stringify({ query: buildAuditQuery(secretName as string | undefined, req.body?.changes === "1" || req.body?.changes === 1), timespan: `P${days}D` }),
       });
       return tableToObjects(body.tables?.[0]);
     })
