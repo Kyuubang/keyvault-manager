@@ -1,4 +1,5 @@
 import express, { type NextFunction, type Request, type Response } from "express";
+import rateLimit from "express-rate-limit";
 import { accessPolicyAllowsWrite, rbacAllowsWrite, type AccessPolicy, type RbacPermission } from "./permissions.js";
 import { isSecretName, isVaultName, isVersion, parseVaultResourceId, vaultHost } from "./validate.js";
 import { buildAuditQuery, tableToObjects, type LaTable } from "./audit.js";
@@ -104,7 +105,18 @@ export function createApp(opts: { fetch?: Fetch; clientId?: string; tenantId?: s
   const fetchFn = opts.fetch ?? fetch;
   const app = express();
   app.disable("x-powered-by");
+  app.set("trust proxy", 1);
   app.use(express.json({ limit: "256kb" }));
+  app.use(
+    "/api",
+    rateLimit({
+      windowMs: 60_000,
+      limit: 120,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: { message: "Too many requests, please try again later" } },
+    })
+  );
   app.use("/api", (_req, res, next) => {
     res.set("Cache-Control", "no-store");
     next();
