@@ -279,11 +279,11 @@ export function createApp(opts: { fetch?: Fetch; clientId?: string; tenantId?: s
     route(async (req) => {
       const vault = vaultIdQuery(req);
       const days = daysQuery(req);
-      const secret = req.query.secret;
-      if (secret !== undefined && !isSecretName(secret)) throw new HttpError(400, "Invalid secret name");
+      const secretName = req.query.secretName;
+      if (secretName !== undefined && !isSecretName(secretName)) throw new HttpError(400, "Invalid secret name");
       const body: { tables?: LaTable[] } = await call(fetchFn, `${LOG_ANALYTICS}${vault.id}/query`, bearer(req, "x-la-token"), {
         method: "POST",
-        body: JSON.stringify({ query: buildAuditQuery(secret as string | undefined, req.query.changes === "1"), timespan: `P${days}D` }),
+        body: JSON.stringify({ query: buildAuditQuery(secretName as string | undefined, req.query.changes === "1"), timespan: `P${days}D` }),
       });
       return tableToObjects(body.tables?.[0]);
     })

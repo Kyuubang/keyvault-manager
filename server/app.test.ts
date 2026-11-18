@@ -135,7 +135,7 @@ describe("audit routes", () => {
       })],
     ]);
     const res = await request(createApp({ fetch: f }))
-      .get(`/api/audit?resourceId=${encodeURIComponent(vaultId("kv-1"))}&secret=db&days=30`)
+      .get(`/api/audit?resourceId=${encodeURIComponent(vaultId("kv-1"))}&secretName=db&days=30`)
       .set("x-la-token", "t");
     expect(res.status).toBe(200);
     expect(res.body).toEqual([{ OperationName: "SecretSet", Caller: "me@x.com" }]);

@@ -86,7 +86,7 @@ export const api = {
     });
   },
   async audit(resourceId: string, days: number, secret?: string, changesOnly = false): Promise<AuditRow[]> {
-    const q = `resourceId=${enc(resourceId)}&days=${days}${secret ? `&secret=${enc(secret)}` : ""}${changesOnly ? "&changes=1" : ""}`;
+    const q = `resourceId=${enc(resourceId)}&days=${days}${secret ? `&secretName=${enc(secret)}` : ""}${changesOnly ? "&changes=1" : ""}`;
     return request(`/api/audit?${q}`, { "x-la-token": await getToken("la") });
   },
   async activity(resourceId: string, days: number): Promise<ActivityEvent[]> {
